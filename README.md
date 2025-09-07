@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17072732.svg)](https://zenodo.org/badge/DOI/10.5281/zenodo.17072732)
+
 # "Efficient deployment of graph and LLM based techniques in anomaly and network attack detection" Experiments Code
 
 ## Description
