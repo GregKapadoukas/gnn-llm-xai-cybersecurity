@@ -1,10 +1,10 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17072732.svg)](https://zenodo.org/badge/DOI/10.5281/zenodo.17072732)
 
-# "Efficient deployment of graph and LLM based techniques in anomaly and network attack detection" Experiments Code
+# "Explainable graph- and LLM-based techniques for anomaly and network attack detection" Experiments Code
 
 ## Description
 
-This repository contains the source code for the experiments done for the paper "Efficient deployment of graph and LLM based techniques in anomaly and network attack detection".
+This repository contains the source code for the experiments done for the paper "Explainable graph- and LLM-based techniques for anomaly and network attack detection".
 
 ## Execution Environment Setup
 
