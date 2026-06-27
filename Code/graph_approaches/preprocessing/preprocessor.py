@@ -16,9 +16,17 @@ def loadCSVsAndCreateGraphs(
     graphs_threshold,
     graph_type,
     network_ips,
+    n_jobs: int = -1,
 ):
     assert graph_type == "Endpoint" or graph_type == "Generalized"
     graphs_by_label = {}
+    traffic_graph_stats = {
+        "packet_rows_seen": 0,
+        "packet_rows_converted": 0,
+        "packet_rows_dropped": 0,
+        "graphs_created": 0,
+        "elapsed_seconds": 0.0,
+    }
     unique_graph_hashes = set()
     for csvs_path in csvs_paths:
         print(f"Converting from path {csvs_path}")
@@ -40,9 +48,11 @@ def loadCSVsAndCreateGraphs(
                         # print(
                         #    f"Processing label: {label}, with graphs len size: {math.floor(len(df_splitted[key])/packet_num_in_graph)}"
                         # )
-                        graphs = dfToTrafficGraphs(
-                            df_splitted[key], packet_num_in_graph
+                        graphs, df_to_graph_stats = dfToTrafficGraphs(
+                            df_splitted[key], packet_num_in_graph, return_stats=True, n_jobs=n_jobs
                         )
+                        for stat_name in traffic_graph_stats:
+                            traffic_graph_stats[stat_name] += df_to_graph_stats[stat_name]
                         graphs, unique_graph_hashes = removeIdenticalGraphsFromList(
                             graphs, unique_graph_hashes
                         )
@@ -55,6 +65,7 @@ def loadCSVsAndCreateGraphs(
                         )
                     i += 1
     graphs_by_label = processRemainingGraphs(graphs_by_label, graphs_path)
+    printTrafficGraphStats(traffic_graph_stats)
 
 
 def groupGraphsByLabel(graphs_by_label, graphs_path, graphs_threshold, graphs, label):
@@ -134,3 +145,33 @@ def removeIdenticalGraphsFromList(graphs, unique_graph_hashes):
             unique_graph_hashes.add(hash)
             unique_graphs.append(graph)
     return unique_graphs, unique_graph_hashes
+
+
+def printTrafficGraphStats(stats):
+    elapsed_seconds = stats["elapsed_seconds"]
+    graphs_per_second = (
+        stats["graphs_created"] / elapsed_seconds if elapsed_seconds > 0 else 0.0
+    )
+    packets_per_second = (
+        stats["packet_rows_converted"] / elapsed_seconds
+        if elapsed_seconds > 0
+        else 0.0
+    )
+    avg_graph_latency_ms = (
+        (elapsed_seconds / stats["graphs_created"]) * 1000
+        if stats["graphs_created"] > 0
+        else 0.0
+    )
+    print("=" * 89)
+    print(
+        "| DataFrame-to-traffic-graph preprocessing\n"
+        f"| packet rows seen: {stats['packet_rows_seen']} "
+        f"| packet rows converted: {stats['packet_rows_converted']} "
+        f"| packet rows dropped by incomplete graph windows: {stats['packet_rows_dropped']}\n"
+        f"| graphs created before duplicate removal: {stats['graphs_created']} "
+        f"| graph construction time: {elapsed_seconds:.6f} s\n"
+        f"| avg graph construction latency: {avg_graph_latency_ms:.6f} ms/graph\n"
+        f"| throughput: {graphs_per_second:.6f} graphs/s "
+        f"| {packets_per_second:.6f} packet rows/s"
+    )
+    print("=" * 89)

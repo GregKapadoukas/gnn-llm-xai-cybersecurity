@@ -32,6 +32,8 @@ class LaplacianGraphEmbeddings(nn.Module):
         number_eigenvectors: int,
         embedding_size: int,
         device,
+        lap_pe_backend: str = "torch",
+        lap_pe_sign_flip: str = "random",
     ):
         super(LaplacianGraphEmbeddings, self).__init__()
         self.number_nodes = number_nodes
@@ -42,8 +44,18 @@ class LaplacianGraphEmbeddings(nn.Module):
         )
         self.node_features_linear_layer = nn.Linear(node_features_size, embedding_size)
         self.device = device
+        self.lap_pe_backend = lap_pe_backend
+        self.lap_pe_sign_flip = lap_pe_sign_flip
+
+        if lap_pe_backend not in ("dgl", "torch"):
+            raise ValueError(f"Unknown Laplacian PE backend: {lap_pe_backend}")
+        if lap_pe_sign_flip not in ("deterministic", "random", "none"):
+            raise ValueError(f"Unknown Laplacian PE sign flip: {lap_pe_sign_flip}")
 
     def forward(self, graphs):
+        if self.lap_pe_backend == "torch":
+            return self._forward_torch_batched(graphs)
+
         node_embeddings = []
         adjacency_matrices = []
         for graph in graphs:
@@ -67,6 +79,98 @@ class LaplacianGraphEmbeddings(nn.Module):
         node_embeddings = torch.stack((node_embeddings), dim=0)
         adjacency_matrices = torch.stack((adjacency_matrices), dim=0)
         return node_embeddings, adjacency_matrices
+
+    def _forward_torch_batched(self, graphs):
+        node_features = torch.stack(
+            [graph.ndata["feature"].float().to(self.device) for graph in graphs],
+            dim=0,
+        )
+        adjacency_matrices = torch.stack(
+            [
+                graph.adjacency_matrix().to_dense().float().to(self.device)
+                for graph in graphs
+            ],
+            dim=0,
+        )
+        in_degrees = torch.stack(
+            [
+                graph.in_degrees().float().to(self.device).clamp_min(1)
+                for graph in graphs
+            ],
+            dim=0,
+        )
+
+        positional_encoding = self._batched_laplacian_pe(
+            adjacency_matrices,
+            in_degrees,
+        )
+        positional_encoding_projected = self.positional_encoding_linear_layer(
+            positional_encoding
+        )
+        node_features_projected = self.node_features_linear_layer(node_features)
+
+        return node_features_projected + positional_encoding_projected, adjacency_matrices
+
+    def _batched_laplacian_pe(self, adjacency_matrices, in_degrees):
+        batch_size, num_nodes, _ = adjacency_matrices.shape
+        pe_dim = self.number_eigenvectors
+        positional_encoding = adjacency_matrices.new_zeros(
+            batch_size,
+            num_nodes,
+            pe_dim,
+        )
+
+        if pe_dim == 0 or num_nodes <= 1:
+            return positional_encoding
+
+        inv_sqrt_degrees = torch.rsqrt(in_degrees)
+        normalized_adjacency = (
+            adjacency_matrices
+            * inv_sqrt_degrees.unsqueeze(2)
+            * inv_sqrt_degrees.unsqueeze(1)
+        )
+        identity = torch.eye(
+            num_nodes,
+            dtype=adjacency_matrices.dtype,
+            device=adjacency_matrices.device,
+        ).unsqueeze(0)
+        laplacian = identity - normalized_adjacency
+
+        _, eigenvectors = torch.linalg.eigh(laplacian)
+        eigenvectors = eigenvectors[:, :, 1:]
+
+        available_eigenvectors = min(pe_dim, eigenvectors.size(2))
+        positional_encoding[:, :, :available_eigenvectors] = eigenvectors[
+            :, :, :available_eigenvectors
+        ]
+        return self._apply_eigenvector_signs(
+            positional_encoding,
+            available_eigenvectors,
+        )
+
+    def _apply_eigenvector_signs(self, positional_encoding, available_eigenvectors):
+        if positional_encoding.numel() == 0 or available_eigenvectors == 0:
+            return positional_encoding
+
+        if self.lap_pe_sign_flip == "none":
+            return positional_encoding
+
+        active_encoding = positional_encoding[:, :, :available_eigenvectors]
+        if self.lap_pe_sign_flip == "random":
+            signs = torch.randint(
+                0,
+                2,
+                (active_encoding.size(0), 1, active_encoding.size(2)),
+                device=active_encoding.device,
+            ).to(active_encoding.dtype)
+            signs = signs * 2 - 1
+        else:
+            max_abs_indices = active_encoding.abs().argmax(dim=1, keepdim=True)
+            signs = active_encoding.gather(1, max_abs_indices).sign()
+
+        signs = torch.where(signs == 0, torch.ones_like(signs), signs)
+        positional_encoding[:, :, :available_eigenvectors] = active_encoding * signs
+        return positional_encoding
 
 
 class MultiheadGraphAttention(nn.Module):
@@ -231,6 +335,8 @@ class GraphTransformer(nn.Module):
         dropout: float,
         num_classes: int,
         device,
+        lap_pe_backend: str = "dgl",
+        lap_pe_sign_flip: str = "deterministic",
     ):
         super(GraphTransformer, self).__init__()
 
@@ -245,6 +351,8 @@ class GraphTransformer(nn.Module):
             number_eigenvectors,
             embedding_size,
             device,
+            lap_pe_backend,
+            lap_pe_sign_flip,
         )
 
         # Create the graph encoder (with all it's layers)

@@ -1,4 +1,5 @@
 import hashlib
+import time
 
 import dgl
 import matplotlib.pyplot as plt
@@ -201,13 +202,25 @@ def createTrafficGraph(df):
     return G
 
 
-def dfToTrafficGraphs(df, n):
+def dfToTrafficGraphs(df, n, return_stats=False, n_jobs: int = -1):
     num_graphs = df.shape[0] // n
+    converted_packet_rows = num_graphs * n
 
-    final_graphs = Parallel(n_jobs=-1)(
+    start_time = time.perf_counter()
+    final_graphs = Parallel(n_jobs=n_jobs)(
         delayed(createTrafficGraph)(
             df.iloc[i * n : (i + 1) * n],
         )
         for i in range(num_graphs)
     )
+    elapsed_seconds = time.perf_counter() - start_time
+
+    if return_stats:
+        return final_graphs, {
+            "packet_rows_seen": int(df.shape[0]),
+            "packet_rows_converted": int(converted_packet_rows),
+            "packet_rows_dropped": int(df.shape[0] - converted_packet_rows),
+            "graphs_created": len(final_graphs),
+            "elapsed_seconds": elapsed_seconds,
+        }
     return final_graphs
