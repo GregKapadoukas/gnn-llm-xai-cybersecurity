@@ -3,10 +3,12 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from google.colab import drive
+drive.mount('/content/drive')
 
 ####
 problem = 'MULTI'
-data = pd.read_csv('../../../Datasets/Edge-IIoTset Cyber Security Dataset of IoT & IIoT/DNN-EdgeIIoT-dataset.csv')
+data = pd.read_csv('/content/drive/MyDrive/Data/DNN-EdgeIIoT-dataset.csv')
 
 #########CLASS DISTRIBUTION WHETHER BINARY OR MULTI ###########
 print('Distribution of labels:',data['Attack_label'].value_counts(normalize=True,dropna=False)*100)
@@ -57,12 +59,12 @@ data_matrix = data.corr(numeric_only=True)
 plt.figure(figsize=(18, 14))
 sns.heatmap(data_matrix, annot=True, fmt=".2f", cmap="coolwarm", cbar=True)
 plt.title("Correlation Matrix Heatmap")
-plt.savefig('./Features.png')
+plt.savefig('/content/drive/MyDrive/Saves/Features.png')
 plt.show()
 print(data_matrix['Attack_label'].abs().sort_values(ascending=False))
 ##################################
 ########SAVING TO CSV ###########
-#data.to_csv('../../../Datasets/Edge-IIoTset Cyber Security Dataset of IoT & IIoT/EdgeIIoT.csv',index=False,mode='w')
+#data.to_csv('/content/drive/MyDrive/Saves/EdgeIIoT.csv',index=False,mode='w')
 
 if problem == 'BINARY':
   data.rename(columns={'Attack_label':'label'},inplace=True)
@@ -105,8 +107,8 @@ def encode(entry):
 #######APPLY ON EACH ROW AND CONVERT TO DATAFRAME AND SAVE#####
 data.apply(encode,axis=1)
 sequences = pd.DataFrame(sequences)
-#sequences.to_csv('../../../Datasets/Edge-IIoTset Cyber Security Dataset of IoT & IIoT/EdgeIIoT_sequences_binary.csv',index=False,mode='w')
-sequences.to_csv('../../../Datasets/Edge-IIoTset Cyber Security Dataset of IoT & IIoT/EdgeIIoT_sequences_multi.csv',index=False,mode='w')
+#sequences.to_csv('/content/drive/MyDrive/Saves/EdgeIIoT_sequences_binary.csv',index=False,mode='w')
+sequences.to_csv('/content/drive/MyDrive/Saves/EdgeIIoT_sequences_multi.csv',index=False,mode='w')
 
 ############DIAGNOSTICS##########
 sequences.info()

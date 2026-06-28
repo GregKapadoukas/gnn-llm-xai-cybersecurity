@@ -3,10 +3,12 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+from google.colab import drive
+drive.mount('/content/drive')
 ##########################
 problem = 'MULTI'
 ##########READ DATA AVOIDING UNUSED COLUMN####
-data = pd.read_csv('../../../Datasets/IOT-23/iot23_combined_new.csv',index_col=0)
+data = pd.read_csv('/content/drive/MyDrive/Data/iot23_combined_new.csv',index_col=0)
 print('CHECK:',data.index.duplicated().any())
 ########Print class distribution and Dataframe dimensions ##########
 print('Rows and columns of the dataset:',data.shape)
@@ -57,7 +59,7 @@ sns.heatmap(data_matrix, annot=True, fmt=".2f", cmap="coolwarm", cbar=True)
 plt.title("Correlation Matrix Heatmap")
 plt.show()
 ###########SAVE TO CSV###############
-#data.to_csv('../../../Datasets/IOT-23/cleaned.csv',index=False,mode='w')
+#data.to_csv('/content/drive/MyDrive/Saves/cleaned.csv',index=False,mode='w')
 if problem == 'MULTI':
   data['label'] = data['label'].map({'Benign':0,'DDoS':1,'Okiru':2,'PartOfAHorizontalPortScan':3,'C&C':4,'C&C-HeartBeat':4,'C&C-FileDownload':4,'C&C-Torii':4,'C&C-Mirai':4,'C&C-HeartBeat-FileDownload':4})
   data.dropna(axis=0,how='any',inplace=True) #If some categories are not included in the mapping they are removed
@@ -96,5 +98,5 @@ sequences.info()
 print(sequences.shape)
 print(sequences.head(1))
 
-#sequences.to_csv('../../../Datasets/IOT-23/IoT23_sequences_binary.csv',index=False,mode='w')
-sequences.to_csv('../../../Datasets/IOT-23/IoT23_sequences_multi.csv',index=False,mode='w')
+#sequences.to_csv('/content/drive/MyDrive/Saves/IoT23_sequences_binary.csv',index=False,mode='w')
+sequences.to_csv('/content/drive/MyDrive/Saves/IoT23_sequences_multi.csv',index=False,mode='w')
